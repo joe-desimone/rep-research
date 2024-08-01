@@ -57,24 +57,6 @@ def generate_pathsegment(output, exe, arguments=None, icon=None):
     print(f"Writing to: {output}")
     lnk.save()
 
-def generate_pathsegment(output, exe, arguments=None, icon=None):
-    lnk = pylnk3.create(output)
-    lnk.link_flags.IsUnicode = True
-    lnk.link_info = None
-    levels = list(pylnk3.path_levels(exe))
-    elements = [pylnk3.RootEntry(pylnk3.ROOT_MY_COMPUTER),
-                pylnk3.DriveEntry(levels[0])]
-    path = "\\".join(exe.split("\\")[1:])
-    segment = segment_from_path(path)
-    elements.append(segment)
-    lnk.shell_item_id_list = pylnk3.LinkTargetIDList()
-    lnk.shell_item_id_list.items = elements
-
-    add_args_icon(lnk, arguments, icon)
-
-    print(f"Writing to: {output}")
-    lnk.save()
-
 def generate_dot(output, exe, arguments=None, icon=None):
     exe += "."
     lnk = pylnk3.create(output)
