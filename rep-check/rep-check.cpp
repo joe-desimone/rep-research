@@ -23,7 +23,6 @@ typedef struct
     void *   data;
 } extraInfo_t;
 
-
 typedef  __int64 (*MpQueryFileTrustByHandle2_t)(HANDLE hFile, void * a2, void* a3, 
     params_t* pParams, size_t * count, extraInfo_t ** extraInfo);
 
@@ -35,6 +34,10 @@ int main(int argc, char* argv[])
     uint64_t retVal = 0;
     HANDLE hFile = 0;
     MpQueryFileTrustByHandle2_t MpQueryFileTrustByHandle2 = 0;
+
+    printf("SAC reputation check\n");
+    printf("Author: Joe Desimone\n");
+    printf("Note: SAC must be in eval or enforcement mode\n\n");
 
     if (argc < 2)
     {
